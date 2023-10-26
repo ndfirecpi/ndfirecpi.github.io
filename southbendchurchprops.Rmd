@@ -1,0 +1,120 @@
+---
+title: "ndfirecpi-southbendchurchprops"
+output: html_document
+date: "2023-10-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## South Bend Church Properties
+
+This map displays the church properties within South Bend relative to the various zoning designations.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(rgdal)
+library(tidyverse)
+library(sf)
+library(sp)
+library(tidygeocoder)
+library(leaflet)
+library(mapview)
+library(leafem)
+library(dplyr)
+library(readr)
+library(lattice)
+library(leafpop)
+library(viridis)
+library(raster)
+library(htmltools)
+
+## Load files
+SB_FBB <- st_read("SB_FBB/SB_FBB.shp")
+SB_FBP_zoned <- st_read("SB_FBP_zoned/SB_FBP_zoned.shp")
+SB_zoned_pcls <- st_read("SB_zoned_pcls/SB_zoned_pcls.shp")
+
+# Dissolve parcels in SB_FBP_zoned 
+SB_FBCampus <- st_union(SB_FBP_zoned, by_feature = FALSE)
+SB_FBCampus <- st_as_sf(st_cast(SB_FBCampus, "POLYGON"))
+SB_FBCampus$campus_sqm <- st_area(SB_FBCampus)
+SB_FBCampus$index <- c(1:327)
+
+## Clean SB_zoned_pcls for desired output
+colnames(SB_zoned_pcls)[29] <- "Zoning_Designation"
+
+# First method for joining adjacent parcels based on zoning
+SB_zoned_pcls_combined <- SB_zoned_pcls %>%
+  group_by(Zoning_Designation) %>%
+  summarize(geometry = st_union(geometry)) %>%
+  mutate(Zoning_Designation = Zoning_Designation) %>%
+  st_as_sf() 
+
+SB_zoned_pcls_combined1 <- st_as_sf(st_cast(SB_zoned_pcls_combined, "POLYGON"))
+
+# Identify and remove degenerate geometries
+is_valid <- st_is_valid(SB_zoned_pcls_combined1)
+SB_zoned_pcls_combined1 <- SB_zoned_pcls_combined1[is_valid, ]
+
+# Add area to shapefile
+SB_zoned_pcls_combined1$area <- st_area(SB_zoned_pcls_combined1)
+
+#Create a buffer around campuses
+SB_FBC_buffer <- st_buffer(SB_FBCampus, dist = 50)
+
+## Create Map
+# Transform shapefiles
+SB_zoned_pcls_combined1 <- st_transform(SB_zoned_pcls_combined1, crs = st_crs(4326))
+SB_FBC_buffer <- st_transform(SB_FBC_buffer, crs = st_crs(4326))
+SB_FBCampus <- st_transform(SB_FBCampus, crs = st_crs(4326))
+
+# Extract unique zoning designations
+unique_designations <- unique(SB_zoned_pcls_combined1$Zoning_Designation)
+
+# Create an automatic color palette
+color_palette <- viridis_pal(option = "D")(length(unique_designations))
+
+color_mapping <- colorFactor(palette = color_palette, domain = unique_designations)
+
+# Create summary statistics box
+summary_stats <- htmltools::div(
+  style = "position: absolute; top: 9px; right: -200px; background-color: white; 
+  padding: 15px; border: 1px solid #ccc; font-size: 12px;", 
+  "Summary Statistics:",
+  br(),
+  "Total Faith Based Parcels: ", nrow(SB_FBP_zoned),
+  br(),
+  "Faith Based Parcels (%): ", (nrow(SB_FBP_zoned) / nrow(SB_zoned_pcls)) * 100, "%",
+  br(),
+  "Faith Based Parcels Area (%): ", (sum(SB_FBCampus$campus_sqm) / sum(st_area(SB_zoned_pcls))) * 100, "%"
+)
+
+leaflet() %>%
+  
+  addProviderTiles("CartoDB.Positron") %>%
+  # Add the zoning parcels with popups
+  addPolygons(data = SB_zoned_pcls_combined1,
+              fillColor = ~color_mapping(Zoning_Designation),
+              fillOpacity = 0.5,
+              color = "black",
+              weight = 1,
+              popup = ~paste("Zoning: ", Zoning_Designation)) %>%
+  
+  # Add the buffered campuses with popups
+  addPolygons(data = SB_FBC_buffer,
+              fillColor = "black",
+              fillOpacity = .6,
+              color = "black",
+              weight = 1) %>%
+
+  # Add the faith based campuses
+  addPolygons(data = SB_FBCampus,
+              fillColor = "black",
+              fillOpacity = .6,
+              color = "black",
+              weight = 1,
+              popup = ~paste("Area:", campus_sqm, "m^2)")) %>%
+  
+  # Add summary statistics box
+  addControl(html = summary_stats)
+```
