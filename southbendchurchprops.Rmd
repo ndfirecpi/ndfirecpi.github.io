@@ -1,5 +1,5 @@
 ---
-title: "ndfirecpi-southbendchurchprops"
+title: "Notre Dame FIRE CPI - South Bend"
 output: html_document
 date: "2023-10-10"
 ---
@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 This map displays the church properties within South Bend relative to the various zoning designations.
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 library(rgdal)
 library(tidyverse)
 library(sf)
@@ -33,7 +33,9 @@ library(htmltools)
 SB_FBB <- st_read("SB_FBB/SB_FBB.shp")
 SB_FBP_zoned <- st_read("SB_FBP_zoned/SB_FBP_zoned.shp")
 SB_zoned_pcls <- st_read("SB_zoned_pcls/SB_zoned_pcls.shp")
+```
 
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 # Dissolve parcels in SB_FBP_zoned 
 SB_FBCampus <- st_union(SB_FBP_zoned, by_feature = FALSE)
 SB_FBCampus <- st_as_sf(st_cast(SB_FBCampus, "POLYGON"))
