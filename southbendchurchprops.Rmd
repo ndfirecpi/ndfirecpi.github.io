@@ -1,7 +1,6 @@
 ---
 title: "Notre Dame FIRE CPI - South Bend"
 output: html_document
-date: "2023-10-10"
 ---
 
 ```{r setup, include=FALSE}
@@ -91,8 +90,22 @@ summary_stats <- htmltools::div(
   "Faith Based Parcels Area (%): ", (sum(SB_FBCampus$campus_sqm) / sum(st_area(SB_zoned_pcls))) * 100, "%"
 )
 
-leaflet() %>%
+# Function to generate a color palette
+generate_palette <- function(factor_variable) {
+  unique_values <- unique(factor_variable)
+  num_colors <- length(unique_values)
   
+  # Use viridis color palette with the appropriate number of colors
+  viridis_palette = viridis(num_colors)
+  
+  # Create a named vector with unique values and corresponding colors
+  colors <- setNames(viridis_palette, unique_values)
+  
+  return(colors)
+}
+
+# Create map
+leaflet() %>%
   addProviderTiles("CartoDB.Positron") %>%
   # Add the zoning parcels with popups
   addPolygons(data = SB_zoned_pcls_combined1,
@@ -117,6 +130,19 @@ leaflet() %>%
               weight = 1,
               popup = ~paste("Area:", campus_sqm, "m^2)")) %>%
   
-  # Add summary statistics box
-  addControl(html = summary_stats)
+  # Add legend
+  addLegend(position = "bottomright",
+            colors = viridis(length(unique(SB_zoned_pcls_combined1$Zoning_Designation))),
+            labels = unique(SB_zoned_pcls_combined1$Zoning_Designation),
+            opacity = 0.5,
+            title = "Zoning Designation")
+
 ```
+
+### Summary Statistics:
+
+Total Faith Based Parcels: `r nrow(SB_FBP_zoned)`
+
+Faith Based Parcels (%): `r (nrow(SB_FBP_zoned) / nrow(SB_zoned_pcls)) * 100`%
+
+Faith Based Parcels Area (%): `r (sum(SB_FBCampus$campus_sqm) / sum(st_area(SB_zoned_pcls))) * 100`%
